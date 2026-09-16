@@ -61,6 +61,8 @@ Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}\shell\open\command"; Value
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
-[Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#DoubleAmp(MyAppName)}}"; Flags: nowait postinstall skipifsilent
+; Do not auto-launch the application after installation. Some managed Windows
+; environments block the generated setup executable with error 4551 when a
+; post-install run step attempts to execute an untrusted or policy-blocked file.
+; Users can launch the app manually from the Start menu or desktop shortcut.
 

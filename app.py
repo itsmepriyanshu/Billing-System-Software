@@ -1,12 +1,39 @@
+import importlib
 import os
+import subprocess
+import sys
 import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
+
+def ensure_optional_dependency(module_name: str, package_name: str | None = None) -> bool:
+    package_name = package_name or module_name
+    try:
+        importlib.import_module(module_name)
+        return True
+    except ImportError:
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", package_name],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            importlib.import_module(module_name)
+            return True
+        except Exception:
+            return False
+
+
 try:
-    from reportlab.lib.pagesizes import LETTER
-    from reportlab.pdfgen import canvas
-except ImportError:  # pragma: no cover
+    if ensure_optional_dependency("reportlab.lib.pagesizes", "reportlab"):
+        from reportlab.lib.pagesizes import LETTER
+        from reportlab.pdfgen import canvas
+    else:
+        LETTER = None
+        canvas = None
+except Exception:  # pragma: no cover
     LETTER = None
     canvas = None
 

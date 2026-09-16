@@ -333,7 +333,7 @@ def get_daily_income_report(db_path: str) -> Dict[str, Any]:
         """
         SELECT COUNT(*) AS sales_count, COALESCE(SUM(total_amount), 0) AS total_sales
         FROM sales
-        WHERE date(sale_date) = date('now')
+        WHERE date(sale_date, 'localtime') = date('now', 'localtime')
         """
     ).fetchone()
     conn.close()

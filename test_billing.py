@@ -84,6 +84,12 @@ class BillingSystemTests(unittest.TestCase):
         self.assertEqual(daily_report["sales_count"], 1)
         self.assertGreater(daily_report["total_sales"], 0)
 
+    def test_ensure_optional_dependency_installs_missing_package(self):
+        with patch.object(app_module.importlib, "import_module", side_effect=[ImportError("missing"), object()]) as mock_import_module, patch.object(app_module.subprocess, "run") as mock_run:
+            self.assertTrue(app_module.ensure_optional_dependency("reportlab"))
+            self.assertEqual(mock_import_module.call_count, 2)
+            mock_run.assert_called_once()
+
     def test_main_does_not_call_winfo_after_login_failure(self):
         class DummyRoot:
             def __init__(self):

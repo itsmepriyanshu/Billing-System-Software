@@ -85,13 +85,7 @@ Each receipt includes:
 
 ## Deployment
 
-This project is currently a **Tkinter desktop application** and **cannot be deployed directly on Vercel**.
-
-To make it available online, it would need to be converted into a web application using technologies such as:
-
-* Flask or FastAPI
-* React or HTML/CSS/JavaScript
-* PostgreSQL or Supabase (instead of SQLite)
+This project is currently a **Tkinter desktop application** 
 
 ## Future Improvements
 
@@ -105,4 +99,4 @@ To make it available online, it would need to be converted into a web applicatio
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the Serab License.

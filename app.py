@@ -1,6 +1,14 @@
 import os
 import tkinter as tk
+from datetime import datetime
 from tkinter import filedialog, messagebox, simpledialog, ttk
+
+try:
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.pdfgen import canvas
+except ImportError:  # pragma: no cover
+    LETTER = None
+    canvas = None
 
 from database import (
     Workbook,
@@ -92,12 +100,12 @@ class BillingApp:
         ttk.Entry(left_frame, textvariable=self.search_var, width=30).grid(row=10, column=0, padx=8, pady=4)
         ttk.Button(left_frame, text="Search", command=self.search_products).grid(row=11, column=0, sticky="w", padx=8, pady=4)
 
-        self.product_tree = ttk.Treeview(left_frame, columns=("price", "stock", "barcode", "id"), show="headings", height=12)
-        self.product_tree.heading("#0", text="Name")
+        self.product_tree = ttk.Treeview(left_frame, columns=("name", "price", "stock", "barcode", "id"), show="headings", height=12)
+        self.product_tree.heading("name", text="Name")
         self.product_tree.heading("price", text="Price")
         self.product_tree.heading("stock", text="Stock")
         self.product_tree.heading("barcode", text="Barcode")
-        self.product_tree.column("#0", width=160)
+        self.product_tree.column("name", width=160)
         self.product_tree.column("price", width=80)
         self.product_tree.column("stock", width=70)
         self.product_tree.column("barcode", width=100)
@@ -141,12 +149,12 @@ class BillingApp:
         self.vat_var = tk.StringVar(value="0")
         ttk.Entry(right_frame, textvariable=self.vat_var, width=30).grid(row=7, column=1, padx=8, pady=4)
 
-        self.bill_tree = ttk.Treeview(right_frame, columns=("price", "qty", "total"), show="headings", height=10)
-        self.bill_tree.heading("#0", text="Product")
+        self.bill_tree = ttk.Treeview(right_frame, columns=("name", "price", "qty", "total"), show="headings", height=10)
+        self.bill_tree.heading("name", text="Product")
         self.bill_tree.heading("price", text="Price")
         self.bill_tree.heading("qty", text="Qty")
         self.bill_tree.heading("total", text="Total")
-        self.bill_tree.column("#0", width=180)
+        self.bill_tree.column("name", width=180)
         self.bill_tree.column("price", width=90)
         self.bill_tree.column("qty", width=70)
         self.bill_tree.column("total", width=90)
@@ -180,8 +188,7 @@ class BillingApp:
             self.product_tree.insert(
                 "",
                 tk.END,
-                text=product["name"],
-                values=(product["price"], product.get("stock_quantity", 0), product.get("barcode", ""), product["id"]),
+                values=(product["name"], product["price"], product.get("stock_quantity", 0), product.get("barcode", ""), product["id"]),
             )
             self.bill_products.append(
                 {
@@ -204,11 +211,11 @@ class BillingApp:
         if not selected:
             return
         item = self.product_tree.item(selected[0])
-        self.name_var.set(item["text"])
-        self.price_var.set(item["values"][0])
-        self.barcode_var.set(item["values"][2])
-        self.stock_var.set(item["values"][1])
-        self.selected_product_id = item["values"][3] if len(item["values"]) > 3 else None
+        self.name_var.set(item["values"][0])
+        self.price_var.set(item["values"][1])
+        self.barcode_var.set(item["values"][3])
+        self.stock_var.set(item["values"][2])
+        self.selected_product_id = item["values"][4] if len(item["values"]) > 4 else None
 
     def add_product(self):
         name = self.name_var.get().strip()
@@ -288,8 +295,7 @@ class BillingApp:
             self.product_tree.insert(
                 "",
                 tk.END,
-                text=product["name"],
-                values=(product["price"], product.get("stock_quantity", 0), product.get("barcode", ""), product["id"]),
+                values=(product["name"], product["price"], product.get("stock_quantity", 0), product.get("barcode", ""), product["id"]),
             )
 
     def lookup_by_barcode(self):
@@ -337,7 +343,7 @@ class BillingApp:
             return
 
         item_total = calculate_item_total(product["price"], quantity)
-        self.bill_tree.insert("", tk.END, text=selected_name, values=(product["price"], quantity, item_total))
+        self.bill_tree.insert("", tk.END, values=(selected_name, product["price"], quantity, item_total))
         self.update_total()
 
     def update_total(self):
@@ -345,8 +351,8 @@ class BillingApp:
         for child in self.bill_tree.get_children():
             item = self.bill_tree.item(child)
             items.append({
-                "price": float(item["values"][0]),
-                "quantity": int(item["values"][1]),
+                "price": float(item["values"][1]),
+                "quantity": int(item["values"][2]),
             })
         subtotal = calculate_grand_total(items)
         discount_rate = self._parse_float(self.discount_var.get(), 0)
@@ -371,13 +377,13 @@ class BillingApp:
         items = []
         for child in self.bill_tree.get_children():
             item = self.bill_tree.item(child)
-            product = next((entry for entry in self.bill_products if entry["name"] == item["text"]), None)
+            product = next((entry for entry in self.bill_products if entry["name"] == item["values"][0]), None)
             if product is None:
                 continue
             items.append({
                 "product_id": product["id"],
-                "price": float(item["values"][0]),
-                "quantity": int(item["values"][1]),
+                "price": float(item["values"][1]),
+                "quantity": int(item["values"][2]),
             })
 
         try:
@@ -403,14 +409,17 @@ class BillingApp:
         messagebox.showinfo("Success", f"Receipt saved and sale recorded. Sale ID: {sale_id}")
 
     def export_receipt(self, sale_id: int, items: list):
-        default_name = f"receipt_{sale_id}.txt"
+        default_name = f"receipt_{sale_id}.pdf"
         save_path = filedialog.asksaveasfilename(
             initialfile=default_name,
-            defaultextension=".txt",
+            defaultextension=".pdf",
             title="Save Receipt",
-            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            filetypes=[("PDF Files", "*.pdf"), ("All Files", "*.*")],
         )
         if not save_path:
+            return
+        if canvas is None or LETTER is None:
+            messagebox.showerror("Missing Dependency", "Install reportlab to create PDF receipts: pip install reportlab")
             return
 
         subtotal = sum(float(item["price"]) * int(item["quantity"]) for item in items)
@@ -421,31 +430,73 @@ class BillingApp:
         vat_amount = taxable * (vat_rate / 100.0)
         total_amount = taxable + vat_amount
 
-        lines = [
-            "Bagmati lungdar pasal",
-            "Receipt",
-            f"Sale ID: {sale_id}",
-            f"Customer: {self.customer_name_var.get().strip() or 'Walk-in'}",
-            f"Phone: {self.customer_phone_var.get().strip() or '-'}",
-            "",
-            "Items:",
-        ]
+        page_width = 300
+        page_height = max(620, 420 + len(items) * 22)
+        pdf = canvas.Canvas(save_path, pagesize=(page_width, page_height))
+        left = 28
+        right = page_width - left
+        center = page_width / 2
+        y = page_height - 48
+
+        def centered(text, font="Helvetica", size=11, gap=18):
+            nonlocal y
+            pdf.setFont(font, size)
+            pdf.drawCentredString(center, y, text)
+            y -= gap
+
+        def row(label, value, gap=18):
+            nonlocal y
+            pdf.setFont("Helvetica", 10)
+            pdf.drawString(left, y, label)
+            pdf.drawRightString(right, y, value)
+            y -= gap
+
+        centered("Bagmati lungdar pasal", "Helvetica-Bold", 13, 20)
+        centered("BILLING RECEIPT", "Helvetica", 11, 32)
+
+        pdf.setFont("Helvetica", 10)
+        pdf.drawString(left, y, f"SALE: {sale_id}")
+        pdf.drawRightString(right, y, f"{datetime.now():%d/%m/%Y}")
+        y -= 18
+        pdf.drawString(left, y, f"CUSTOMER: {self.customer_name_var.get().strip() or 'Walk-in'}")
+        pdf.drawRightString(right, y, f"{datetime.now():%I:%M %p}")
+        y -= 18
+        pdf.drawString(left, y, f"PHONE: {self.customer_phone_var.get().strip() or '-'}")
+        pdf.drawRightString(right, y, "CASHIER: ADMIN")
+        y -= 24
+
+        pdf.line(left, y, right, y)
+        y -= 22
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(left, y, "QTY")
+        pdf.drawString(left + 42, y, "ITEM")
+        pdf.drawRightString(right, y, "AMOUNT")
+        y -= 18
+        pdf.setFont("Helvetica", 10)
         for item in items:
             product = next((entry for entry in self.bill_products if entry["id"] == item["product_id"]), None)
             product_name = product["name"] if product else "Unknown"
-            lines.append(f"- {product_name} | Qty: {item['quantity']} | Price: {item['price']}")
-        lines.extend([
-            "",
-            f"Subtotal: Rs. {subtotal:.2f}",
-            f"Discount: {discount_rate:.0f}%",
-            f"VAT: {vat_rate:.0f}%",
-            f"Total: Rs. {total_amount:.2f}",
-            "",
-            "Thank you for shopping with us!",
-        ])
+            item_total = float(item["price"]) * int(item["quantity"])
+            pdf.drawString(left, y, str(item["quantity"]))
+            pdf.drawString(left + 42, y, product_name[:25])
+            pdf.drawRightString(right, y, f"Rs. {item_total:.2f}")
+            y -= 20
 
-        with open(save_path, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(lines))
+        pdf.line(left, y + 4, right, y + 4)
+        y -= 18
+        pdf.setFont("Helvetica", 10)
+        row("CASH", "SALE")
+        y -= 8
+        row("SUBTOTAL", f"Rs. {subtotal:.2f}")
+        row("DISCOUNT", f"{discount_rate:.0f}%")
+        row("VAT", f"{vat_rate:.0f}%")
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(left, y, "TOTAL")
+        pdf.drawRightString(right, y, f"Rs. {total_amount:.2f}")
+        y -= 34
+        centered("THANK YOU FOR SHOPPING", "Helvetica-Bold", 10, 16)
+        centered("WITH US!", "Helvetica-Bold", 10, 10)
+        pdf.save()
 
     def show_sales_report(self):
         report = get_sales_report(self.db_path)

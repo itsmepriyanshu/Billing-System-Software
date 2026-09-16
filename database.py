@@ -26,7 +26,10 @@ def ensure_main_excel(db_path: str) -> str:
 
 def initialize_db(db_path: Optional[str] = None) -> str:
     if db_path is None:
-        db_path = "inventory_billing.db"
+        data_dir = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".billing_system")
+        data_dir = os.path.join(data_dir, "BillingSystem")
+        os.makedirs(data_dir, exist_ok=True)
+        db_path = os.path.join(data_dir, "inventory_billing.db")
 
     conn = sqlite3.connect(db_path)
     conn.execute(
